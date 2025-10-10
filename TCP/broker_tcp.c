@@ -21,18 +21,18 @@ char topic_map[MAX_CLIENTS][MAX_TOPIC_LEN] = {{0}};
 // --- Función lógica de redistribución ---
 void redistribute_message(const char *buffer)
 {
-    char topic[MAX_TOPIC_LEN];
-    char message_to_send[BUFFER_SIZE];
+    char topic[MAX_TOPIC_LEN]; //Arreglo para el tema
+    char message_to_send[BUFFER_SIZE]; // Arreglo para el mensaje a enviar
 
-    // Asumimos el formato es 'PUB:TEMA:MENSAJE'.
+    // Asumimos el formato es 'PUB-TEMA-MENSAJE'.
     // Usamos sscanf para parsear
-    if (sscanf(buffer, "PUB:%49[^:]:%[^\n]", topic, message_to_send) != 2)
+    if (sscanf(buffer, "PUB-%49[^-]-%[^\n]", topic, message_to_send) != 2) 
     {
-        printf("Broker: Formato de publicación inválido.\n");
+        printf("Broker: Formato de publicación inválido.\n"); //TEMPORAL: probar esto
         return;
     }
 
-    printf("Broker: Publicación recibida - TEMA: %s, MENSAJE: %s\n", topic, message_to_send);
+    printf("(Broker) Publicación recibida --> TEMA: %s, MENSAJE: %s\n", topic, message_to_send);
 
     // Iterar sobre todos los clientes y reenviar si el tema coincide.
     for (int i = 0; i < MAX_CLIENTS; i++)
@@ -48,11 +48,11 @@ void redistribute_message(const char *buffer)
 
 // --- Función para la lógica de suscripción ---
 void handle_subscription(int sender_socket, const char *buffer)
-{
+{ 
     char topic[MAX_TOPIC_LEN];
 
     // Asumimos el formato es 'SUB:TEMA'.
-    if (sscanf(buffer, "SUB:%49[^\n]", topic) != 1)
+    if (sscanf(buffer, "SUB-%49[^\n]", topic) != 1)
     {
         printf("Broker: Formato de suscripción inválido.\n");
         return;
@@ -75,10 +75,10 @@ void handle_subscription(int sender_socket, const char *buffer)
 int main()
 {
     int master_socket, new_socket, addrlen, activity, i, valread;
-    struct sockaddr_in address;
+    struct sockaddr_in address; // Dirección del socket
 
-    char buffer[BUFFER_SIZE] = {0};
-    fd_set readfds;
+    char buffer[BUFFER_SIZE] = {0}; // Buffer para datos entrantes
+    fd_set readfds; // Conjunto de descriptores de archivo para select
 
     // 1. Crear el socket maestro (listener)
     master_socket = socket(AF_INET, SOCK_STREAM, 0);
