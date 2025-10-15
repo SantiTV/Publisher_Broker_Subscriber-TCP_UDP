@@ -8,20 +8,20 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define BROKER_IP "127.0.0.1"
-#define BROKER_PORT "9000"
-#define BUFFER_SIZE 1024
+#define IP_BROKER "127.0.0.1"
+#define PUERTO_BROKER "9000"
+#define TAM_BUFFER 1024
 
 int main(int argc, char *argv[])
 {
-    int sockfd;
-    struct addrinfo hints, *servinfo, *p;
-    char buffer[BUFFER_SIZE];
-    char subscription_msg[60];
+    int socket_fd;
+    struct addrinfo hints, *info, *p;
+    char buffer[TAM_BUFFER];
+    char mensaje_subs[60];
 
     if (argc < 2)
     {
-        fprintf(stderr, "Uso: %s <TEMA1> [TEMA2] [TEMA3] ...\n", argv[0]);
+        fprintf(stderr, "Uso: %s <tema1> [tema2] [tema3] ...\n", argv[0]);
         exit(1);
     }
 
@@ -29,64 +29,66 @@ int main(int argc, char *argv[])
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(BROKER_IP, BROKER_PORT, &hints, &servinfo) != 0)
+    if (getaddrinfo(IP_BROKER, PUERTO_BROKER, &hints, &info) != 0)
     {
-        fprintf(stderr, "Error getaddrinfo\n");
+        fprintf(stderr, "Error en getaddrinfo\n");
         return 1;
     }
 
-    for (p = servinfo; p != NULL; p = p->ai_next)
+    for (p = info; p != NULL; p = p->ai_next)
     {
-        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sockfd == -1)
+        socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (socket_fd == -1)
             continue;
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) != -1)
+        if (connect(socket_fd, p->ai_addr, p->ai_addrlen) != -1)
             break;
-        close(sockfd);
+        close(socket_fd);
     }
 
     if (p == NULL)
     {
-        fprintf(stderr, "Subscriber: Falló la conexión con el Broker\n");
+        fprintf(stderr, "Subscriber: No se pudo conectar con el broker\n");
         return 2;
     }
-    freeaddrinfo(servinfo);
-    printf("Subscriber: Conectado al Broker.\n");
 
-    // Suscribirse a todos los temas dados
+    freeaddrinfo(info);
+    printf("Subscriber conectado al broker.\n");
+
+    // Enviar todas las suscripciones
     for (int i = 1; i < argc; i++)
     {
-        snprintf(subscription_msg, sizeof(subscription_msg), "SUB:%s", argv[i]);
-        if (send(sockfd, subscription_msg, strlen(subscription_msg), 0) == -1)
+        snprintf(mensaje_subs, sizeof(mensaje_subs), "SUB:%s", argv[i]);
+        if (send(socket_fd, mensaje_subs, strlen(mensaje_subs), 0) == -1)
         {
-            perror("Send suscripción error");
-            close(sockfd);
+            perror("Error al enviar suscripción");
+            close(socket_fd);
             return 3;
         }
-        printf("Subscriber: Suscrito al tema: %s\n", argv[i]);
+        printf("Suscrito al tema: %s\n", argv[i]);
         sleep(1);
     }
 
-    printf("Esperando mensajes de los temas suscritos...\n");
+    printf("Esperando mensajes...\n");
 
+    // Escucha permanente
     while (1)
     {
-        int numbytes;
-        if ((numbytes = recv(sockfd, buffer, BUFFER_SIZE - 1, 0)) <= 0)
+        int bytes_recibidos = recv(socket_fd, buffer, TAM_BUFFER - 1, 0);
+        if (bytes_recibidos <= 0)
         {
-            if (numbytes == 0)
-                printf("Subscriber: Conexión cerrada por el Broker.\n");
+            if (bytes_recibidos == 0)
+                printf("Conexión cerrada por el broker.\n");
             else
-                perror("Recv error");
+                perror("Error al recibir mensaje");
             break;
         }
 
-        buffer[numbytes] = '\0';
-        printf("\n--- NUEVA ACTUALIZACIÓN ---\n");
+        buffer[bytes_recibidos] = '\0';
+        printf("\n--- NUEVO MENSAJE ---\n");
         printf("%s\n", buffer);
-        printf("---------------------------\n");
+        printf("----------------------\n");
     }
 
-    close(sockfd);
+    close(socket_fd);
     return 0;
 }

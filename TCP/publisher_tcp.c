@@ -8,69 +8,71 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 
-#define BROKER_IP "127.0.0.1"
-#define BROKER_PORT "9000"
-#define BUFFER_SIZE 1024
+#define IP_BROKER "127.0.0.1"
+#define PUERTO_BROKER "9000"
+#define TAM_BUFFER 1024
 
 int main(void)
 {
-    int sockfd;
-    struct addrinfo hints, *servinfo, *p;
+    int socket_fd;
+    struct addrinfo hints, *info, *p;
 
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(BROKER_IP, BROKER_PORT, &hints, &servinfo) != 0)
+    if (getaddrinfo(IP_BROKER, PUERTO_BROKER, &hints, &info) != 0)
     {
-        fprintf(stderr, "Error getaddrinfo\n");
+        fprintf(stderr, "Error en getaddrinfo\n");
         return 1;
     }
 
-    for (p = servinfo; p != NULL; p = p->ai_next)
+    for (p = info; p != NULL; p = p->ai_next)
     {
-        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (sockfd == -1)
+        socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (socket_fd == -1)
             continue;
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) != -1)
+        if (connect(socket_fd, p->ai_addr, p->ai_addrlen) != -1)
             break;
-        close(sockfd);
+        close(socket_fd);
     }
 
     if (p == NULL)
     {
-        fprintf(stderr, "Publisher: Falló la conexión con el Broker\n");
+        fprintf(stderr, "Publisher: No se pudo conectar con el broker\n");
         return 2;
     }
-    freeaddrinfo(servinfo);
-    printf("Publisher: Conectado al Broker.\n");
+
+    freeaddrinfo(info);
+    printf("Publisher conectado con éxito al broker.\n");
 
     while (1)
     {
-        char topic[50];
-        char message[BUFFER_SIZE];
-        char full_msg[BUFFER_SIZE + 50];
+        char tema[50];
+        char mensaje[TAM_BUFFER];
+        char mensaje_final[TAM_BUFFER + 50];
 
-        printf("\nIntroduzca TEMA: ");
-        if (fgets(topic, sizeof(topic), stdin) == NULL)
+        printf("\nTema: ");
+        if (fgets(tema, sizeof(tema), stdin) == NULL)
             break;
-        topic[strcspn(topic, "\n")] = '\0';
+        tema[strcspn(tema, "\n")] = '\0';
 
-        printf("Introduzca MENSAJE: ");
-        if (fgets(message, sizeof(message), stdin) == NULL)
+        printf("Mensaje: ");
+        if (fgets(mensaje, sizeof(mensaje), stdin) == NULL)
             break;
-        message[strcspn(message, "\n")] = '\0';
+        mensaje[strcspn(mensaje, "\n")] = '\0';
 
-        snprintf(full_msg, sizeof(full_msg), "PUB:%s:%s", topic, message);
+        snprintf(mensaje_final, sizeof(mensaje_final), "PUB:%s:%s", tema, mensaje);
 
-        if (send(sockfd, full_msg, strlen(full_msg), 0) == -1)
+        if (send(socket_fd, mensaje_final, strlen(mensaje_final), 0) == -1)
         {
-            perror("Send error");
+            perror("Error al enviar mensaje");
             break;
         }
-        printf("Publisher: Mensaje enviado: \"%s\"\n", full_msg);
+
+        printf("Mensaje enviado: \"%s\"\n", mensaje_final);
     }
 
-    close(sockfd);
+    close(socket_fd);
     return 0;
 }

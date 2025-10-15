@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -9,72 +10,67 @@
 
 #define IP_BROKER "127.0.0.1"
 #define PUERTO_BROKER "9000"
-#define TAMANIO_BUFFER 1024
+#define TAM_BUFFER 1024
 
 int main(void)
 {
-    int socket_udp;
-    struct addrinfo hints, *servinfo, *p;
+    int socket_fd;
+    struct addrinfo hints, *info, *p;
 
-    // 1. Configuración de la conexión
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;    // IPv4 o IPv6
-    hints.ai_socktype = SOCK_DGRAM; // Socket UDP
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
 
-    if (getaddrinfo(IP_BROKER, PUERTO_BROKER, &hints, &servinfo) != 0)
+    if (getaddrinfo(IP_BROKER, PUERTO_BROKER, &hints, &info) != 0)
     {
         fprintf(stderr, "Error en getaddrinfo\n");
         return 1;
     }
 
-    // 2. Crear el socket UDP
-    for (p = servinfo; p != NULL; p = p->ai_next)
+    for (p = info; p != NULL; p = p->ai_next)
     {
-        socket_udp = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (socket_udp == -1)
-            continue; // Intentar con la siguiente dirección
-
-        break; // Socket creado con éxito
+        socket_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (socket_fd != -1)
+            break;
     }
 
     if (p == NULL)
     {
-        fprintf(stderr, "Publisher: Falló la creación del socket\n");
+        fprintf(stderr, "Publisher: No se pudo crear el socket UDP\n");
         return 2;
     }
 
-    printf("Publisher: Socket UDP creado.\n");
+    printf("Publisher UDP listo para enviar mensajes.\n");
 
-    // 3. Bucle de envío de mensajes
     while (1)
     {
         char tema[50];
-        char mensaje[TAMANIO_BUFFER];
-        char mensaje_completo[TAMANIO_BUFFER + 50];
+        char mensaje[TAM_BUFFER];
+        char mensaje_completo[TAM_BUFFER + 50];
 
-        printf("\nIntroduzca TEMA: ");
+        printf("\nTema: ");
         if (fgets(tema, sizeof(tema), stdin) == NULL)
             break;
-        tema[strcspn(tema, "\n")] = '\0'; // Eliminar salto de línea
+        tema[strcspn(tema, "\n")] = '\0';
 
-        printf("Introduzca MENSAJE: ");
+        printf("Mensaje: ");
         if (fgets(mensaje, sizeof(mensaje), stdin) == NULL)
             break;
-        mensaje[strcspn(mensaje, "\n")] = '\0'; // Eliminar salto de línea
+        mensaje[strcspn(mensaje, "\n")] = '\0';
 
-        // Formatear el mensaje
         snprintf(mensaje_completo, sizeof(mensaje_completo), "PUB:%s:%s", tema, mensaje);
 
-        // Enviar el mensaje al broker
-        if (sendto(socket_udp, mensaje_completo, strlen(mensaje_completo), 0, p->ai_addr, p->ai_addrlen) == -1)
+        if (sendto(socket_fd, mensaje_completo, strlen(mensaje_completo), 0,
+                   p->ai_addr, p->ai_addrlen) == -1)
         {
             perror("Error al enviar mensaje");
             break;
         }
-        printf("Publisher: Mensaje enviado: %s\n", mensaje_completo);
+
+        printf("Mensaje enviado al broker: %s\n", mensaje_completo);
     }
 
-    freeaddrinfo(servinfo); // Liberar la memoria de las direcciones
-    close(socket_udp);      // Cerrar el socket
+    freeaddrinfo(info);
+    close(socket_fd);
     return 0;
 }
