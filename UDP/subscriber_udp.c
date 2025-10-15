@@ -1,7 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -14,23 +14,21 @@
 
 int main(int argc, char *argv[])
 {
-    int socketfd;
+    int sockfd;
     struct addrinfo hints, *servinfo, *p;
-    char buffer[BUFFER_SIZE];
     struct sockaddr_in broker_addr;
     socklen_t addr_len = sizeof(broker_addr);
+    char buffer[BUFFER_SIZE];
 
-    if (argc != 2)
+    if (argc < 2)
     {
-        fprintf(stderr, "Uso: %s <TEMA_A_SUSCRIBIRSE>\n", argv[0]);
+        fprintf(stderr, "Uso: %s <TEMA1> [TEMA2] ...\n", argv[0]);
         exit(1);
     }
-    const char *topic = argv[1];
 
-    // 1. Configuración de la conexión
     memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;    // IPv4 o IPv6
-    hints.ai_socktype = SOCK_DGRAM; // Socket UDP
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_DGRAM;
 
     if (getaddrinfo(BROKER_IP, BROKER_PORT, &hints, &servinfo) != 0)
     {
@@ -38,14 +36,11 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // 2. Crear el socket UDP
     for (p = servinfo; p != NULL; p = p->ai_next)
     {
-        socketfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (socketfd == -1)
-            continue; // Intentar con la siguiente dirección
-
-        break; // Socket creado con éxito
+        sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+        if (sockfd != -1)
+            break;
     }
 
     if (p == NULL)
@@ -54,39 +49,42 @@ int main(int argc, char *argv[])
         return 2;
     }
 
-    printf("Subscriber: Socket UDP creado.\n");
+    printf("Subscriber UDP iniciado.\n");
 
-    // 3. Enviar mensaje de suscripción: SUB:TEMA
-    snprintf(buffer, sizeof(buffer), "SUB:%s", topic);
-    if (sendto(socketfd, buffer, strlen(buffer), 0, p->ai_addr, p->ai_addrlen) == -1)
+    // Suscribirse a todos los temas
+    for (int i = 1; i < argc; i++)
     {
-        perror("Error al enviar mensaje de suscripción");
-        freeaddrinfo(servinfo);
-        close(socketfd);
-        return 3;
+        snprintf(buffer, sizeof(buffer), "SUB:%s", argv[i]);
+        if (sendto(sockfd, buffer, strlen(buffer), 0, p->ai_addr, p->ai_addrlen) == -1)
+        {
+            perror("Error al enviar suscripción");
+        }
+        else
+        {
+            printf("Subscriber: Suscrito al tema: %s\n", argv[i]);
+            sleep(1);
+        }
     }
-    printf("Subscriber: Suscrito al tema: %s\n", topic);
 
-    freeaddrinfo(servinfo); // Liberar la memoria de las direcciones
+    printf("Esperando mensajes...\n");
 
-    // 4. Bucle de recepción de mensajes
+    // Recibir mensajes de cualquier tema
     while (1)
     {
-        int bytes_received = recvfrom(socketfd, buffer, sizeof(buffer) - 1, 0, (struct sockaddr *)&broker_addr, &addr_len);
-        if (bytes_received <= 0)
+        int bytes = recvfrom(sockfd, buffer, BUFFER_SIZE - 1, 0, (struct sockaddr *)&broker_addr, &addr_len);
+        if (bytes <= 0)
         {
-            if (bytes_received == 0)
-                printf("Subscriber: Conexión cerrada por el Broker.\n");
-            else
-                perror("Error al recibir mensaje");
+            perror("Error al recibir mensaje");
             break;
         }
-        buffer[bytes_received] = '\0'; // Asegurar terminación nula
-        printf("\n--- ACTUALIZACIÓN (%s) ---\n", topic);
+
+        buffer[bytes] = '\0';
+        printf("\n--- NUEVA ACTUALIZACIÓN ---\n");
         printf("%s\n", buffer);
         printf("---------------------------\n");
     }
 
-    close(socketfd);
+    freeaddrinfo(servinfo);
+    close(sockfd);
     return 0;
 }
