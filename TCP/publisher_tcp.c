@@ -73,8 +73,7 @@ int main(void)
             break;
         }
         printf("Publisher: Mensaje enviado: \"%s\"\n", full_msg);
-        sleep(1);
-    }
+        }
 
     close(sockfd);
     return 0;
