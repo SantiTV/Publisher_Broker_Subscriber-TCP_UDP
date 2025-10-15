@@ -17,7 +17,6 @@ int main(void)
     int sockfd;
     struct addrinfo hints, *servinfo, *p;
 
-    // 1. Configuración de la conexión
     memset(&hints, 0, sizeof hints);
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -28,7 +27,6 @@ int main(void)
         return 1;
     }
 
-    // 2. Conectar al Broker
     for (p = servinfo; p != NULL; p = p->ai_next)
     {
         sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
@@ -47,7 +45,6 @@ int main(void)
     freeaddrinfo(servinfo);
     printf("Publisher: Conectado al Broker.\n");
 
-    // 3. Bucle de envío de mensajes
     while (1)
     {
         char topic[50];
@@ -64,7 +61,6 @@ int main(void)
             break;
         message[strcspn(message, "\n")] = '\0';
 
-        // Formato de Publicación: PUB:TEMA:MENSAJE
         snprintf(full_msg, sizeof(full_msg), "PUB:%s:%s", topic, message);
 
         if (send(sockfd, full_msg, strlen(full_msg), 0) == -1)
@@ -73,7 +69,7 @@ int main(void)
             break;
         }
         printf("Publisher: Mensaje enviado: \"%s\"\n", full_msg);
-        }
+    }
 
     close(sockfd);
     return 0;
